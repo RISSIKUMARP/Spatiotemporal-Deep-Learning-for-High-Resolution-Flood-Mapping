@@ -1,0 +1,41 @@
+var houston = ee.Geometry.Rectangle([-95.8, 29.5, -95.0, 30.2]);
+
+
+var inputTable = ee.FeatureCollection('projects/ee-praj3052/assets/Cat_1');  
+
+var era5 = ee.ImageCollection("ECMWF/ERA5_LAND/HOURLY")
+  .filterBounds(houston)
+  .select('total_precipitation');  // in meters/hour
+
+var rainfallVectors = inputTable.map(function(feature) {
+  var dateStr = feature.getString('date');
+  var start = ee.Date(dateStr).update({hour: 0});
+  var end = start.advance(24, 'hour');
+
+  var hourlyRain = era5.filterDate(start, end).toList(24);
+  var rainValues = ee.List.sequence(0, 23).map(function(i) {
+    var img = ee.Image(hourlyRain.get(i)).multiply(1000);
+    var meanRain = img.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: houston,
+      scale: 9000,
+      maxPixels: 1e13
+    }).get('total_precipitation');
+    return meanRain;
+  });
+
+  var keys = ee.List.sequence(0, 23).map(function(i) {
+    return ee.String('hour_').cat(ee.Number(i).format('%02d'));
+  });
+
+  return ee.Feature(null, ee.Dictionary.fromLists(
+    ee.List(['date']).cat(keys),
+    ee.List([dateStr]).cat(rainValues)
+  ));
+});
+
+Export.table.toDrive({
+  collection: rainfallVectors,
+  description: 'Houston_ERA5_24hr_HourlyRainfall_Cat1', 
+  fileFormat: 'CSV'
+});

@@ -1,0 +1,64 @@
+var region = ee.Geometry.Rectangle([-95.8, 29.5, -95.0, 30.2]);
+
+
+var folder = 'GEE_exports/Houston';
+var crs = 'EPSG:4326';
+var dimensions = [256, 256];
+
+var dem = ee.Image("USGS/SRTMGL1_003").clip(region);
+
+
+var slope = ee.Terrain.slope(dem);
+
+var lulc = ee.Image("ESA/WorldCover/v100/2020")
+             .select('Map')
+             .clip(region);
+
+var impervious = ee.Image("USGS/NLCD_RELEASES/2021_REL/NLCD/2021")
+                   .select('impervious')
+                   .clip(region);
+
+
+Export.image.toDrive({
+  image: dem,
+  description: 'houston_dem_2021',
+  folder: folder,
+  fileNamePrefix: 'dem_2021',
+  region: region,
+  crs: crs,
+  dimensions: dimensions,
+  fileFormat: 'GeoTIFF'
+});
+
+Export.image.toDrive({
+  image: slope,
+  description: 'houston_slope_2021',
+  folder: folder,
+  fileNamePrefix: 'slope_2021',
+  region: region,
+  crs: crs,
+  dimensions: dimensions,
+  fileFormat: 'GeoTIFF'
+});
+
+Export.image.toDrive({
+  image: lulc,
+  description: 'houston_lulc_2021',
+  folder: folder,
+  fileNamePrefix: 'lulc_2021',
+  region: region,
+  crs: crs,
+  dimensions: dimensions,
+  fileFormat: 'GeoTIFF'
+});
+
+Export.image.toDrive({
+  image: impervious,
+  description: 'houston_impervious_2021',
+  folder: folder,
+  fileNamePrefix: 'impervious_2021',
+  region: region,
+  crs: crs,
+  dimensions: dimensions,
+  fileFormat: 'GeoTIFF'
+});

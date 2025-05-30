@@ -1,0 +1,69 @@
+// -----------------------------
+// 1. Define Houston Region
+// -----------------------------
+var houston = ee.Geometry.Rectangle([-95.8, 29.5, -95.0, 30.2]);
+
+// -----------------------------
+// 2. Load ERA5-Land Hourly Precipitation
+// -----------------------------
+var era5 = ee.ImageCollection("ECMWF/ERA5_LAND/HOURLY")
+  .filterBounds(houston)
+  .filterDate('2014-01-01', '2024-12-31')
+  .select('total_precipitation');
+
+// -----------------------------
+// 3. Generate Daily Rainfall Images
+// -----------------------------
+var dailyRainList = ee.List.sequence(0, 4017).map(function(i) {
+  var day = ee.Date('2014-01-01').advance(i, 'day');
+  var next = day.advance(1, 'day');
+  var dailyImgs = era5.filterDate(day, next);
+  var count = dailyImgs.size();
+
+  return ee.Algorithms.If(
+    count.gt(0),
+    dailyImgs.sum()
+      .multiply(1000) // Convert to mm
+      .set('date', day.format('YYYY-MM-dd'))
+      .set('system:time_start', day.millis()),
+    null
+  );
+});
+
+// -----------------------------
+// 4. Convert to ImageCollection and Extract Mean Rainfall
+// -----------------------------
+var dailyRain = ee.ImageCollection(dailyRainList).filter(ee.Filter.notNull(['date']));
+
+var features = dailyRain.map(function(img) {
+  var mean = img.reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: houston,
+    scale: 9000,
+    maxPixels: 1e13
+  }).get('total_precipitation');
+
+  return ee.Feature(null, {
+    'date': img.get('date'),
+    'rainfall_mm': mean
+  });
+});
+
+// -----------------------------
+// 5. Filter for Dry Events (≤ 5 mm) and Pick 76 Randomly
+// -----------------------------
+var cat3 = ee.FeatureCollection(features)
+  .filter(ee.Filter.notNull(['rainfall_mm']))
+  .filter(ee.Filter.lte('rainfall_mm', 5))
+  .randomColumn('rand')
+  .sort('rand')
+  .limit(76);
+
+// -----------------------------
+// 6. Export as CSV to Drive
+// -----------------------------
+Export.table.toDrive({
+  collection: cat3,
+  description: 'Houston_ERA5_Cat3_DryRain_76events',
+  fileFormat: 'CSV'
+});
