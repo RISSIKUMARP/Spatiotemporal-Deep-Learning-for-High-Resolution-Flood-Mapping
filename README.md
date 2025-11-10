@@ -27,7 +27,4 @@ Each model integrates:
 - **Fusion**: Attention-based fusion between temporal and spatial features
 - **Decoder**: DeepLabv3+ or U-Net++ for mask generation
 
----
-
-## 📂 Project Structure
 
